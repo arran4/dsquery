@@ -7,7 +7,7 @@ import (
 )
 
 // Builder interface
-type DSQueryBuilder interface {
+type Builder interface {
 	// Query function runs the queries as per data structure
 	Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error)
 	// Count of all queries
@@ -31,7 +31,7 @@ type Base struct {
 	// Data store queries to run
 	Queries []*datastore.Query
 	// Sub queries after that to run
-	SubQueries []DSQueryBuilder
+	SubQueries []Builder
 	// Provided for your convenience when debugging
 	Name string
 }
