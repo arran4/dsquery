@@ -1,0 +1,181 @@
+package dsquery
+
+import (
+	"cloud.google.com/go/datastore"
+	"context"
+	"fmt"
+)
+
+// Builder interface
+type DSQueryBuilder interface {
+	// Query function runs the queries as per data structure
+	Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error)
+	// Count of all queries
+	Len() int
+}
+
+// Extracts all the datastore keys from a `map[string]*datastore.Key`
+func ExtractMapStringKeysKey(m map[string]*datastore.Key) []*datastore.Key {
+	result := make([]*datastore.Key, 0, len(m))
+	for _, v := range m {
+		if v == nil {
+			continue
+		}
+		result = append(result, v)
+	}
+	return result
+}
+
+// Base entity
+type Base struct {
+	// Data store queries to run
+	Queries []*datastore.Query
+	// Sub queries after that to run
+	SubQueries []DSQueryBuilder
+	// Provided for your convenience when debugging
+	Name string
+}
+
+// AND Query
+type And Base
+
+// Count of all queries
+func (qa *And) Len() int {
+	return len(qa.SubQueries) + len(qa.Queries)
+}
+
+// Query function
+func (qa *And) Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error) {
+	m := map[string]*datastore.Key{}
+	v := 0
+	for i, q := range qa.Queries {
+		v++
+		if v > 1 && len(m) == 0 {
+			return []*datastore.Key{}, nil
+		}
+		keys, err := dsClient.GetAll(ctx, q.KeysOnly(), nil)
+		if err != nil {
+			return nil, fmt.Errorf("query error in %s:%d error %w", qa.Name, i, err)
+		}
+		if v == 1 {
+			for _, k := range keys {
+				if k == nil {
+					continue
+				}
+				m[k.Encode()] = k
+			}
+		} else {
+			m = DSKeyMapMergeAnd(m, keys)
+		}
+	}
+	for i, q := range qa.SubQueries {
+		v++
+		if v > 1 && len(m) == 0 {
+			return []*datastore.Key{}, nil
+		}
+		keys, err := q.Query(dsClient, ctx)
+		if err != nil {
+			return nil, fmt.Errorf("query error in subquery %s:%d error %w", qa.Name, i, err)
+		}
+		if v == 1 {
+			for _, k := range keys {
+				if k == nil {
+					continue
+				}
+				m[k.Encode()] = k
+			}
+		} else {
+			m = DSKeyMapMergeAnd(m, keys)
+		}
+	}
+
+	return ExtractMapStringKeysKey(m), nil
+}
+
+// Helper function to merge a set with an array, and produce a set of datastore keys.
+func DSKeyMapMergeAnd(m map[string]*datastore.Key, keys []*datastore.Key) map[string]*datastore.Key {
+	s := len(m)
+	if s > len(keys) {
+		s = len(keys)
+	}
+	m2 := make(map[string]*datastore.Key, s)
+	for _, k := range keys {
+		if k == nil {
+			continue
+		}
+		ks := k.Encode()
+		if _, ok := m[ks]; ok {
+			m2[ks] = k
+		}
+	}
+	return m2
+}
+
+// The OR query
+type Or Base
+
+// Count of all queries
+func (qo *Or) Len() int {
+	return len(qo.SubQueries) + len(qo.Queries)
+}
+
+// Query function
+func (qo *Or) Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error) {
+	m := map[string]*datastore.Key{}
+	for i, q := range qo.Queries {
+		keys, err := dsClient.GetAll(ctx, q.KeysOnly(), nil)
+		if err != nil {
+			return nil, fmt.Errorf("query error in %s:%d error %w", qo.Name, i, err)
+		}
+		for _, k := range keys {
+			if k == nil {
+				continue
+			}
+			m[k.Encode()] = k
+		}
+	}
+	for i, q := range qo.SubQueries {
+		keys, err := q.Query(dsClient, ctx)
+		if err != nil {
+			return nil, fmt.Errorf("query error in subquery %s:%d error %w", qo.Name, i, err)
+		}
+		for _, k := range keys {
+			if k == nil {
+				continue
+			}
+			m[k.Encode()] = k
+		}
+	}
+
+	return ExtractMapStringKeysKey(m), nil
+}
+
+// An object that contains just a single query, provided for debugging or intentinally ordering queries in a particular way
+type Ident struct {
+	StoredQuery *datastore.Query
+	Name        string
+}
+
+// Count of all queries
+func (qi *Ident) Len() int {
+	if qi.StoredQuery != nil {
+		return 1
+	}
+	return 0
+}
+
+// Query function
+func (qi *Ident) Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error) {
+	m := map[string]*datastore.Key{}
+	keys, err := dsClient.GetAll(ctx, qi.StoredQuery.KeysOnly(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("query error in %s error %w", qi.Name, err)
+	}
+	for _, k := range keys {
+		if k == nil {
+			continue
+		}
+		m[k.Encode()] = k
+	}
+	return ExtractMapStringKeysKey(m), nil
+}
