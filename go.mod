@@ -1,4 +1,4 @@
-module dsquery
+module github.com/arran4/dsquery
 
 go 1.16
 
