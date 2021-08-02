@@ -72,6 +72,8 @@ Say for the query:
 	}
 
 ```
+Should return: ```Orange and Chilli```
+
 Say for the query:
 * All Fruits that are (Orange or Red) AND (Grown in China OR USA)
 ```go
@@ -108,3 +110,4 @@ Say for the query:
 	}
 
 ```
+Should return: ```Orange and Chilli```
