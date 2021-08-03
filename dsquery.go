@@ -174,7 +174,7 @@ func (qi *Ident) Query(dsClient *datastore.Client, ctx context.Context) ([]*data
 	return keys, nil
 }
 
-// An object that contains just a single query, provided for debugging or intentinally ordering queries in a particular way
+// An object that contains just a single query, provides thread safe caching
 type Cached struct {
 	StoredQuery   Query
 	StoredResults []*datastore.Key
