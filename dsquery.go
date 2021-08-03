@@ -208,7 +208,7 @@ func (c *Cached) Len() int {
 	c.RWMutex.RLock()
 	defer c.RWMutex.RUnlock()
 	if c.StoredQuery != nil {
-		return 1
+		return c.StoredQuery.Len()
 	}
 	return 0
 }
