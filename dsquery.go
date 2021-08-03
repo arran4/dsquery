@@ -4,10 +4,11 @@ import (
 	"cloud.google.com/go/datastore"
 	"context"
 	"fmt"
+	"sync"
 )
 
-// Builder interface
-type Builder interface {
+// Query interface
+type Query interface {
 	// Query function runs the queries as per data structure
 	Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error)
 	// Count of all queries
@@ -31,7 +32,7 @@ type Base struct {
 	// Data store queries to run
 	Queries []*datastore.Query
 	// Sub queries after that to run
-	SubQueries []Builder
+	SubQueries []Query
 	// Provided for your convenience when debugging
 	Name string
 }
@@ -166,16 +167,45 @@ func (qi *Ident) Len() int {
 
 // Query function
 func (qi *Ident) Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error) {
-	m := map[string]*datastore.Key{}
 	keys, err := dsClient.GetAll(ctx, qi.StoredQuery.KeysOnly(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("query error in %s error %w", qi.Name, err)
 	}
-	for _, k := range keys {
-		if k == nil {
-			continue
-		}
-		m[k.Encode()] = k
+	return keys, nil
+}
+
+// An object that contains just a single query, provided for debugging or intentinally ordering queries in a particular way
+type Cached struct {
+	StoredQuery   Query
+	StoredResults []*datastore.Key
+	Name          string
+	sync.RWMutex
+}
+
+// Count of all queries
+func (c *Cached) Len() int {
+	c.RWMutex.RLock()
+	defer c.RWMutex.RUnlock()
+	if c.StoredQuery != nil {
+		return 1
 	}
-	return ExtractMapStringKeysKey(m), nil
+	return 0
+}
+
+// Query function
+func (c *Cached) Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error) {
+	c.RWMutex.RLock()
+	if c.StoredResults != nil {
+		c.RWMutex.RUnlock()
+		return c.StoredResults, nil
+	}
+	c.RWMutex.RUnlock()
+	c.RWMutex.Lock()
+	defer c.RWMutex.Unlock()
+	keys, err := c.StoredQuery.Query(dsClient, ctx)
+	if err != nil {
+		return nil, fmt.Errorf("query error in %s error %w", c.Name, err)
+	}
+	c.StoredResults = keys
+	return c.StoredResults, nil
 }
