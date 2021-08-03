@@ -10,9 +10,13 @@ import (
 // Query interface
 type Query interface {
 	// Query function runs the queries as per data structure
-	Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error)
+	Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error)
 	// Count of all queries
 	Len() int
+}
+
+type DatastoreClient interface {
+	GetAll(ctx context.Context, q *datastore.Query, dst interface{}) (keys []*datastore.Key, err error)
 }
 
 // Extracts all the datastore keys from a `map[string]*datastore.Key`
@@ -46,7 +50,7 @@ func (qa *And) Len() int {
 }
 
 // Query function
-func (qa *And) Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error) {
+func (qa *And) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
 	m := map[string]*datastore.Key{}
 	v := 0
 	for i, q := range qa.Queries {
@@ -121,7 +125,7 @@ func (qo *Or) Len() int {
 }
 
 // Query function
-func (qo *Or) Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error) {
+func (qo *Or) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
 	m := map[string]*datastore.Key{}
 	for i, q := range qo.Queries {
 		keys, err := dsClient.GetAll(ctx, q.KeysOnly(), nil)
@@ -166,7 +170,7 @@ func (qi *Ident) Len() int {
 }
 
 // Query function
-func (qi *Ident) Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error) {
+func (qi *Ident) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
 	keys, err := dsClient.GetAll(ctx, qi.StoredQuery.KeysOnly(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("query error in %s error %w", qi.Name, err)
@@ -193,7 +197,7 @@ func (c *Cached) Len() int {
 }
 
 // Query function
-func (c *Cached) Query(dsClient *datastore.Client, ctx context.Context) ([]*datastore.Key, error) {
+func (c *Cached) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
 	c.RWMutex.RLock()
 	if c.StoredResults != nil {
 		c.RWMutex.RUnlock()
