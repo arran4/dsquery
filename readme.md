@@ -111,3 +111,7 @@ Say for the query:
 
 ```
 Should return: ```Orange and Chilli```
+
+# Notes
+
+Happy to receive PRs.. Especially around documentation and testing.
