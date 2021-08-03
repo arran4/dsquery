@@ -126,33 +126,50 @@ func (qo *Or) Len() int {
 
 // Query function
 func (qo *Or) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+	l := sync.Mutex{}
 	m := map[string]*datastore.Key{}
-	for i, q := range qo.Queries {
-		keys, err := dsClient.GetAll(ctx, q.KeysOnly(), nil)
-		if err != nil {
-			return nil, fmt.Errorf("query error in %s:%d error %w", qo.Name, i, err)
-		}
+	errChan := make(chan error)
+	add := func(keys []*datastore.Key) {
+		l.Lock()
+		defer l.Unlock()
 		for _, k := range keys {
 			if k == nil {
 				continue
 			}
 			m[k.Encode()] = k
 		}
+	}
+	for i, q := range qo.Queries {
+		go func(i int, q *datastore.Query) {
+			keys, err := dsClient.GetAll(ctx, q.KeysOnly(), nil)
+			if err != nil {
+				errChan <- fmt.Errorf("query error in %s:%d error %w", qo.Name, i, err)
+				return
+			}
+			add(keys)
+			errChan <- nil
+		}(i, q)
 	}
 	for i, q := range qo.SubQueries {
-		keys, err := q.Query(dsClient, ctx)
-		if err != nil {
-			return nil, fmt.Errorf("query error in subquery %s:%d error %w", qo.Name, i, err)
-		}
-		for _, k := range keys {
-			if k == nil {
-				continue
+		go func(i int, q Query) {
+			keys, err := q.Query(dsClient, ctx)
+			if err != nil {
+				errChan <- fmt.Errorf("query error in subquery %s:%d error %w", qo.Name, i, err)
+				return
 			}
-			m[k.Encode()] = k
+			add(keys)
+			errChan <- nil
+		}(i, q)
+	}
+	var err error
+	for c := qo.Len(); c > 0; c-- {
+		r := <-errChan
+		if r != nil {
+			err = r
 		}
 	}
-
-	return ExtractMapStringKeysKey(m), nil
+	close(errChan)
+	return ExtractMapStringKeysKey(m), err
 }
 
 // An object that contains just a single query, provided for debugging or intentinally ordering queries in a particular way
