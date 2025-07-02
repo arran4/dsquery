@@ -79,8 +79,8 @@ Say for the query:
 ```go
     fruitQuery := &dsquery.And{
         Name: "root fruit query",
-		Queries:    []*datastore.Query{},
-		SubQueries: []*DSQueryBuilder{
+        Queries:    []*datastore.Query{},
+        SubQueries: []dsquery.Query{
             &dsquery.Or{
                 Name: "color query",
                 Queries:    []*datastore.Query{
