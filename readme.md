@@ -115,3 +115,7 @@ Should return: ```Orange and Chilli```
 # Notes
 
 Happy to receive PRs.. Especially around documentation and testing.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
