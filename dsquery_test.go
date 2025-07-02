@@ -395,6 +395,44 @@ func TestCached_Query(t *testing.T) {
 	}
 }
 
+func TestNot_Query(t *testing.T) {
+	type args struct {
+		dsClient DatastoreClient
+		ctx      context.Context
+	}
+	q := datastore.NewQuery("")
+	tests := []struct {
+		name    string
+		nq      *Not
+		args    args
+		want    []*datastore.Key
+		wantErr bool
+		wantLen int
+	}{
+		{"Simple exclusion", &Not{Queries: []*datastore.Query{q}, SubQueries: []Query{&StoredResult{KeyArrayCreate("2"), nil}}}, args{CreateMockDS1(), nil}, KeyArrayCreate("1"), false, 2},
+		{"Multiple queries", &Not{Queries: []*datastore.Query{q, q}, SubQueries: []Query{&StoredResult{KeyArrayCreate("2"), nil}}}, args{CreateMockDS1(), nil}, KeyArrayCreate("1", "3"), false, 3},
+		{"Error passthrough query", &Not{Queries: []*datastore.Query{q}}, args{CreateMockDSErr(), nil}, nil, true, 1},
+		{"Error passthrough subquery", &Not{SubQueries: []Query{&Error{errors.New("err")}}}, args{nil, nil}, nil, true, 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.nq.Query(tt.args.dsClient, tt.args.ctx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			l := tt.nq.Len()
+			if l != tt.wantLen {
+				t.Errorf("Len() = %v, wantLen %v", l, tt.wantLen)
+				return
+			}
+			if !KeyArraysEqual(got, tt.want) {
+				t.Errorf("Query() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 type Error struct{ error }
 
 func (e *Error) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
