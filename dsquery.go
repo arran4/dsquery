@@ -19,7 +19,15 @@ type Query interface {
 	Len() int
 }
 
+// DatastoreClient exposes the datastore operations required by this package.
+// The real *datastore.Client type already satisfies this interface.  Custom or
+// test implementations should execute the provided query and return all
+// resulting keys. The `dst` parameter is kept for signature compatibility with
+// datastore.Client.GetAll and may be nil.
 type DatastoreClient interface {
+	// GetAll should perform `q` against the underlying datastore and return
+	// every matching key. Implementations may ignore `dst` as queries in
+	// this package are executed in keys-only mode.
 	GetAll(ctx context.Context, q *datastore.Query, dst interface{}) (keys []*datastore.Key, err error)
 }
 
@@ -272,7 +280,7 @@ func (c *Cached) Len() int {
 func (c *Cached) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
 	c.RWMutex.RLock()
 	if c.StoredResults != nil && (c.Expiration.IsZero() || time.Now().Before(c.Expiration)) {
-		c.RWMutex.RUnlock()
+		defer c.RWMutex.RUnlock()
 		return c.StoredResults, nil
 	}
 	c.RWMutex.RUnlock()

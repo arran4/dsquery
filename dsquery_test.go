@@ -66,14 +66,17 @@ type MockDSResult struct {
 
 type MockDS struct {
 	m []MockDSResult
+	sync.Mutex
 }
 
 func (m *MockDS) GetAll(ctx context.Context, q *datastore.Query, dst interface{}) (keys []*datastore.Key, err error) {
-	var r *MockDSResult = nil
+	m.Lock()
+	var r *MockDSResult
 	if len(m.m) > 0 {
 		r = &m.m[0]
 		m.m = m.m[1:]
 	}
+	m.Unlock()
 	if r != nil {
 		if r.Lock != nil {
 			<-r.Lock
@@ -469,4 +472,48 @@ func TestCached_Expiration(t *testing.T) {
 	if c.Count != 2 {
 		t.Fatalf("count after expiration = %d, want 2", c.Count)
 	}
+}
+
+func TestCachedQuery_StoredResults(t *testing.T) {
+	c := &Cached{
+		StoredQuery:   &Count{StoredResult: KeyArrayCreate("b")},
+		StoredResults: KeyArrayCreate("a"),
+	}
+	got, err := c.Query(nil, nil)
+	if err != nil {
+		t.Fatalf("Query() error = %v", err)
+	}
+	if !KeyArraysEqual(got, KeyArrayCreate("a")) {
+		t.Errorf("Query() got = %v, want %v", got, KeyArrayCreate("a"))
+	}
+	if c.StoredQuery.(*Count).Count != 0 {
+		t.Errorf("StoredQuery executed %d times, want 0", c.StoredQuery.(*Count).Count)
+	}
+}
+
+func TestDSKeyMapMergeAnd(t *testing.T) {
+	t.Run("map bigger than slice", func(t *testing.T) {
+		m := KeyMapCreate("1", "2", "3")
+		keys := KeyArrayCreate("2")
+		got := DSKeyMapMergeAnd(m, keys)
+		if !KeyArraysEqual(ExtractMapStringKeysKey(got), KeyArrayCreate("2")) {
+			t.Errorf("DSKeyMapMergeAnd() = %v, want %v", got, KeyArrayCreate("2"))
+		}
+	})
+	t.Run("nil key ignored", func(t *testing.T) {
+		m := KeyMapCreate("1")
+		keys := []*datastore.Key{nil, datastore.NameKey("asdf", "1", nil), nil}
+		got := DSKeyMapMergeAnd(m, keys)
+		if !KeyArraysEqual(ExtractMapStringKeysKey(got), KeyArrayCreate("1")) {
+			t.Errorf("DSKeyMapMergeAnd() = %v, want %v", got, KeyArrayCreate("1"))
+		}
+	})
+	t.Run("no intersection", func(t *testing.T) {
+		m := KeyMapCreate("1")
+		keys := KeyArrayCreate("2")
+		got := DSKeyMapMergeAnd(m, keys)
+		if len(got) != 0 {
+			t.Errorf("expected empty result, got %v", got)
+		}
+	})
 }
