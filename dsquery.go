@@ -1,3 +1,6 @@
+// Package dsquery provides helpers for composing and executing Google Cloud
+// Datastore queries. It wraps datastore.Query objects with logical operators
+// such as AND/OR and supports optional caching of results.
 package dsquery
 
 import (
