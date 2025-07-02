@@ -18,6 +18,8 @@ yourself with a GetMulti.
 
 ## Examples
 
+For a runnable demonstration, see the command in [cmd/dsquery-example](cmd/dsquery-example).
+
 Given this data structure:
 ```go
 package example
