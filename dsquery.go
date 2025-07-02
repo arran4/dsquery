@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 )
 
 // Query interface
@@ -252,6 +253,8 @@ type Cached struct {
 	StoredQuery   Query
 	StoredResults []*datastore.Key
 	Name          string
+	TTL           time.Duration
+	Expiration    time.Time
 	sync.RWMutex
 }
 
@@ -268,17 +271,26 @@ func (c *Cached) Len() int {
 // Query function
 func (c *Cached) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
 	c.RWMutex.RLock()
-	if c.StoredResults != nil {
+	if c.StoredResults != nil && (c.Expiration.IsZero() || time.Now().Before(c.Expiration)) {
 		c.RWMutex.RUnlock()
 		return c.StoredResults, nil
 	}
 	c.RWMutex.RUnlock()
+
 	c.RWMutex.Lock()
 	defer c.RWMutex.Unlock()
+
+	if c.StoredResults != nil && (c.Expiration.IsZero() || time.Now().Before(c.Expiration)) {
+		return c.StoredResults, nil
+	}
+
 	keys, err := c.StoredQuery.Query(dsClient, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("query error in %s error %w", c.Name, err)
 	}
 	c.StoredResults = keys
+	if c.TTL > 0 {
+		c.Expiration = time.Now().Add(c.TTL)
+	}
 	return c.StoredResults, nil
 }
