@@ -362,9 +362,9 @@ func TestCached_Query(t *testing.T) {
 		dsClient DatastoreClient
 		ctx      context.Context
 	}
-	c2 := &Cached{StoredQuery: &Once{Count{StoredResult: KeyArrayCreate("a")}}}
+	c2 := &Cached{StoredQuery: &Once{Count{StoredResult: KeyArrayCreate("a")}}, TTL: time.Second}
 	o3 := &Once{Count{StoredResult: KeyArrayCreate("a")}}
-	c4 := &Cached{StoredQuery: &Once{Count{StoredResult: KeyArrayCreate("a")}}}
+	c4 := &Cached{StoredQuery: &Once{Count{StoredResult: KeyArrayCreate("a")}}, TTL: time.Second}
 	tests := []struct {
 		name    string
 		query   Query
@@ -373,7 +373,7 @@ func TestCached_Query(t *testing.T) {
 		wantErr bool
 		wantLen int
 	}{
-		{"One query is fine", &Cached{StoredQuery: &Once{Count{StoredResult: KeyArrayCreate("a")}}}, args{nil, nil}, KeyArrayCreate("a"), false, 1},
+		{"One query is fine", &Cached{StoredQuery: &Once{Count{StoredResult: KeyArrayCreate("a")}}, TTL: time.Second}, args{nil, nil}, KeyArrayCreate("a"), false, 1},
 		{"Twice only runs once", &And{SubQueries: []Query{c2, c2}}, args{nil, nil}, KeyArrayCreate("a"), false, 2},
 		{"once run twice fails", &And{SubQueries: []Query{o3, o3}}, args{nil, nil}, nil, true, 2},
 		{"Concurrent fine", &Or{SubQueries: []Query{c4, c4, c4, c4, c4, c4, c4, c4, c4, c4, c4, c4, c4, c4, c4}}, args{nil, nil}, KeyArrayCreate("a"), false, 15},
@@ -444,6 +444,34 @@ func (e *Error) Query(dsClient DatastoreClient, ctx context.Context) ([]*datasto
 
 func (e *Error) Len() int {
 	return 1
+}
+
+func TestCached_Expiration(t *testing.T) {
+	c := &Count{StoredResult: KeyArrayCreate("a")}
+	cache := &Cached{StoredQuery: c, TTL: 10 * time.Millisecond}
+
+	if _, err := cache.Query(nil, nil); err != nil {
+		t.Fatalf("first query error %v", err)
+	}
+	if c.Count != 1 {
+		t.Fatalf("count = %d, want 1", c.Count)
+	}
+
+	if _, err := cache.Query(nil, nil); err != nil {
+		t.Fatalf("second query error %v", err)
+	}
+	if c.Count != 1 {
+		t.Fatalf("count changed before expiration = %d", c.Count)
+	}
+
+	time.Sleep(15 * time.Millisecond)
+
+	if _, err := cache.Query(nil, nil); err != nil {
+		t.Fatalf("third query error %v", err)
+	}
+	if c.Count != 2 {
+		t.Fatalf("count after expiration = %d, want 2", c.Count)
+	}
 }
 
 func TestCachedQuery_StoredResults(t *testing.T) {

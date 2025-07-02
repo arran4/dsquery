@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 )
 
 // Query interface
@@ -260,6 +261,8 @@ type Cached struct {
 	StoredQuery   Query
 	StoredResults []*datastore.Key
 	Name          string
+	TTL           time.Duration
+	Expiration    time.Time
 	sync.RWMutex
 }
 
@@ -276,7 +279,7 @@ func (c *Cached) Len() int {
 // Query function
 func (c *Cached) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
 	c.RWMutex.RLock()
-	if c.StoredResults != nil {
+	if c.StoredResults != nil && (c.Expiration.IsZero() || time.Now().Before(c.Expiration)) {
 		defer c.RWMutex.RUnlock()
 		return c.StoredResults, nil
 	}
@@ -285,9 +288,7 @@ func (c *Cached) Query(dsClient DatastoreClient, ctx context.Context) ([]*datast
 	c.RWMutex.Lock()
 	defer c.RWMutex.Unlock()
 
-	// Double check once we have the write lock in case another goroutine
-	// populated the cache while we were waiting.
-	if c.StoredResults != nil {
+	if c.StoredResults != nil && (c.Expiration.IsZero() || time.Now().Before(c.Expiration)) {
 		return c.StoredResults, nil
 	}
 
@@ -296,5 +297,8 @@ func (c *Cached) Query(dsClient DatastoreClient, ctx context.Context) ([]*datast
 		return nil, fmt.Errorf("query error in %s error %w", c.Name, err)
 	}
 	c.StoredResults = keys
+	if c.TTL > 0 {
+		c.Expiration = time.Now().Add(c.TTL)
+	}
 	return c.StoredResults, nil
 }
