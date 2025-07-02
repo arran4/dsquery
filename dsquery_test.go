@@ -442,3 +442,47 @@ func (e *Error) Query(dsClient DatastoreClient, ctx context.Context) ([]*datasto
 func (e *Error) Len() int {
 	return 1
 }
+
+func TestCachedQuery_StoredResults(t *testing.T) {
+	c := &Cached{
+		StoredQuery:   &Count{StoredResult: KeyArrayCreate("b")},
+		StoredResults: KeyArrayCreate("a"),
+	}
+	got, err := c.Query(nil, nil)
+	if err != nil {
+		t.Fatalf("Query() error = %v", err)
+	}
+	if !KeyArraysEqual(got, KeyArrayCreate("a")) {
+		t.Errorf("Query() got = %v, want %v", got, KeyArrayCreate("a"))
+	}
+	if c.StoredQuery.(*Count).Count != 0 {
+		t.Errorf("StoredQuery executed %d times, want 0", c.StoredQuery.(*Count).Count)
+	}
+}
+
+func TestDSKeyMapMergeAnd(t *testing.T) {
+	t.Run("map bigger than slice", func(t *testing.T) {
+		m := KeyMapCreate("1", "2", "3")
+		keys := KeyArrayCreate("2")
+		got := DSKeyMapMergeAnd(m, keys)
+		if !KeyArraysEqual(ExtractMapStringKeysKey(got), KeyArrayCreate("2")) {
+			t.Errorf("DSKeyMapMergeAnd() = %v, want %v", got, KeyArrayCreate("2"))
+		}
+	})
+	t.Run("nil key ignored", func(t *testing.T) {
+		m := KeyMapCreate("1")
+		keys := []*datastore.Key{nil, datastore.NameKey("asdf", "1", nil), nil}
+		got := DSKeyMapMergeAnd(m, keys)
+		if !KeyArraysEqual(ExtractMapStringKeysKey(got), KeyArrayCreate("1")) {
+			t.Errorf("DSKeyMapMergeAnd() = %v, want %v", got, KeyArrayCreate("1"))
+		}
+	})
+	t.Run("no intersection", func(t *testing.T) {
+		m := KeyMapCreate("1")
+		keys := KeyArrayCreate("2")
+		got := DSKeyMapMergeAnd(m, keys)
+		if len(got) != 0 {
+			t.Errorf("expected empty result, got %v", got)
+		}
+	})
+}
