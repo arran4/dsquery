@@ -116,6 +116,55 @@ func DSKeyMapMergeAnd(m map[string]*datastore.Key, keys []*datastore.Key) map[st
 	return m2
 }
 
+// Helper function to remove keys from a set and produce a new set of datastore keys.
+func DSKeyMapMergeNot(m map[string]*datastore.Key, keys []*datastore.Key) map[string]*datastore.Key {
+	m2 := make(map[string]*datastore.Key, len(m))
+	for k, v := range m {
+		m2[k] = v
+	}
+	for _, k := range keys {
+		if k == nil {
+			continue
+		}
+		delete(m2, k.Encode())
+	}
+	return m2
+}
+
+// The NOT query
+type Not Base
+
+// Count of all queries
+func (qn *Not) Len() int {
+	return len(qn.SubQueries) + len(qn.Queries)
+}
+
+// Query function
+func (qn *Not) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+	m := map[string]*datastore.Key{}
+	for i, q := range qn.Queries {
+		keys, err := dsClient.GetAll(ctx, q.KeysOnly(), nil)
+		if err != nil {
+			return nil, fmt.Errorf("query error in %s:%d error %w", qn.Name, i, err)
+		}
+		for _, k := range keys {
+			if k == nil {
+				continue
+			}
+			m[k.Encode()] = k
+		}
+	}
+	for i, q := range qn.SubQueries {
+		keys, err := q.Query(dsClient, ctx)
+		if err != nil {
+			return nil, fmt.Errorf("query error in subquery %s:%d error %w", qn.Name, i, err)
+		}
+		m = DSKeyMapMergeNot(m, keys)
+	}
+
+	return ExtractMapStringKeysKey(m), nil
+}
+
 // The OR query
 type Or Base
 
