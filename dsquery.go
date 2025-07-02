@@ -269,12 +269,20 @@ func (c *Cached) Len() int {
 func (c *Cached) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
 	c.RWMutex.RLock()
 	if c.StoredResults != nil {
-		c.RWMutex.RUnlock()
+		defer c.RWMutex.RUnlock()
 		return c.StoredResults, nil
 	}
 	c.RWMutex.RUnlock()
+
 	c.RWMutex.Lock()
 	defer c.RWMutex.Unlock()
+
+	// Double check once we have the write lock in case another goroutine
+	// populated the cache while we were waiting.
+	if c.StoredResults != nil {
+		return c.StoredResults, nil
+	}
+
 	keys, err := c.StoredQuery.Query(dsClient, ctx)
 	if err != nil {
 		return nil, fmt.Errorf("query error in %s error %w", c.Name, err)

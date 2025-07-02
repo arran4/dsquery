@@ -66,14 +66,17 @@ type MockDSResult struct {
 
 type MockDS struct {
 	m []MockDSResult
+	sync.Mutex
 }
 
 func (m *MockDS) GetAll(ctx context.Context, q *datastore.Query, dst interface{}) (keys []*datastore.Key, err error) {
-	var r *MockDSResult = nil
+	m.Lock()
+	var r *MockDSResult
 	if len(m.m) > 0 {
 		r = &m.m[0]
 		m.m = m.m[1:]
 	}
+	m.Unlock()
 	if r != nil {
 		if r.Lock != nil {
 			<-r.Lock
