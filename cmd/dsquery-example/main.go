@@ -31,7 +31,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to create datastore client: %v", err)
 	}
-	defer client.Close()
+	defer func() {
+		_ = client.Close()
+	}()
 
 	// Build a query: (Color is Orange or Red) AND (Producers includes China)
 	q := &dsquery.And{
@@ -40,13 +42,13 @@ func main() {
 			&dsquery.Or{
 				Name: "color",
 				Queries: []*datastore.Query{
-					datastore.NewQuery(FruitKind).Filter("Color =", "Orange"),
-					datastore.NewQuery(FruitKind).Filter("Color =", "Red"),
+					datastore.NewQuery(FruitKind).FilterField("Color", "=", "Orange"),
+					datastore.NewQuery(FruitKind).FilterField("Color", "=", "Red"),
 				},
 			},
 			&dsquery.Ident{
 				Name:        "producer",
-				StoredQuery: datastore.NewQuery(FruitKind).Filter("Producers =", "China"),
+				StoredQuery: datastore.NewQuery(FruitKind).FilterField("Producers", "=", "China"),
 			},
 		},
 	}

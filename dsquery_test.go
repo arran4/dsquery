@@ -4,7 +4,6 @@ import (
 	"cloud.google.com/go/datastore"
 	"context"
 	"errors"
-	"math/rand"
 	"reflect"
 	"sync"
 	"testing"
@@ -12,10 +11,6 @@ import (
 )
 
 // Tested elsewhere TODO move here.
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 func TestExtractMapStringKeysKey(t *testing.T) {
 	type args struct {
@@ -41,7 +36,7 @@ func TestExtractMapStringKeysKey(t *testing.T) {
 }
 
 func KeyArrayCreate(s ...string) []*datastore.Key {
-	result := make([]*datastore.Key, len(s), len(s))
+	result := make([]*datastore.Key, len(s))
 	for i, e := range s {
 		result[i] = datastore.NameKey("asdf", e, nil)
 	}
@@ -352,12 +347,6 @@ func TestIdent_Query(t *testing.T) {
 }
 
 func TestCached_Query(t *testing.T) {
-	type fields struct {
-		StoredQuery   Query
-		StoredResults []*datastore.Key
-		Name          string
-		RWMutex       sync.RWMutex
-	}
 	type args struct {
 		dsClient DatastoreClient
 		ctx      context.Context
