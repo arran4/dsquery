@@ -4,13 +4,20 @@ import (
 	"cloud.google.com/go/datastore"
 	"context"
 	"fmt"
+	"sort"
+	"sync"
 )
 
 // staticDS is a simple DatastoreClient used in the examples.
 // Each call to GetAll returns the next slice of keys from results.
-type staticDS struct{ results [][]*datastore.Key }
+type staticDS struct {
+	mu      sync.Mutex
+	results [][]*datastore.Key
+}
 
 func (m *staticDS) GetAll(ctx context.Context, q *datastore.Query, dst interface{}) ([]*datastore.Key, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if len(m.results) == 0 {
 		return nil, nil
 	}
@@ -45,6 +52,7 @@ func ExampleOr() {
 	}}
 
 	keys, _ := q.Query(ds, context.Background())
+	sort.Slice(keys, func(i, j int) bool { return keys[i].Name < keys[j].Name })
 	for _, k := range keys {
 		fmt.Println(k.Name)
 	}
