@@ -109,38 +109,58 @@ func (qa *And) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastor
 	return ExtractMapStringKeysKey(m), nil
 }
 
-// Helper function to merge a set with an array, and produce a set of datastore keys.
-func DSKeyMapMergeAnd(m map[string]*datastore.Key, keys []*datastore.Key) map[string]*datastore.Key {
+// MapIntersect intersects `m` with `items` and returns a new map containing only
+// the items whose derived key exists in `m`.
+func MapIntersect[K comparable, V any](m map[K]V, items []V, keyFn func(V) K) map[K]V {
 	s := len(m)
-	if s > len(keys) {
-		s = len(keys)
+	if s > len(items) {
+		s = len(items)
 	}
-	m2 := make(map[string]*datastore.Key, s)
-	for _, k := range keys {
-		if k == nil {
-			continue
-		}
-		ks := k.Encode()
-		if _, ok := m[ks]; ok {
-			m2[ks] = k
+	m2 := make(map[K]V, s)
+	for _, v := range items {
+		k := keyFn(v)
+		if _, ok := m[k]; ok {
+			m2[k] = v
 		}
 	}
 	return m2
 }
 
-// Helper function to remove keys from a set and produce a new set of datastore keys.
-func DSKeyMapMergeNot(m map[string]*datastore.Key, keys []*datastore.Key) map[string]*datastore.Key {
-	m2 := make(map[string]*datastore.Key, len(m))
+// MapExclude removes all entries from `m` whose keys appear in `items`.
+func MapExclude[K comparable, V any](m map[K]V, items []V, keyFn func(V) K) map[K]V {
+	m2 := make(map[K]V, len(m))
 	for k, v := range m {
 		m2[k] = v
 	}
-	for _, k := range keys {
-		if k == nil {
-			continue
-		}
-		delete(m2, k.Encode())
+	for _, v := range items {
+		k := keyFn(v)
+		delete(m2, k)
 	}
 	return m2
+}
+
+// DSKeyMapMergeAnd intersects a set with a slice of datastore keys using
+// MapIntersect. Nil keys in `keys` are ignored.
+func DSKeyMapMergeAnd(m map[string]*datastore.Key, keys []*datastore.Key) map[string]*datastore.Key {
+	filtered := make([]*datastore.Key, 0, len(keys))
+	for _, k := range keys {
+		if k != nil {
+			filtered = append(filtered, k)
+		}
+	}
+	return MapIntersect(m, filtered, func(k *datastore.Key) string { return k.Encode() })
+}
+
+// DSKeyMapMergeNot removes keys from a set using MapExclude. Nil keys in `keys`
+// are ignored.
+func DSKeyMapMergeNot(m map[string]*datastore.Key, keys []*datastore.Key) map[string]*datastore.Key {
+	filtered := make([]*datastore.Key, 0, len(keys))
+	for _, k := range keys {
+		if k != nil {
+			filtered = append(filtered, k)
+		}
+	}
+	return MapExclude(m, filtered, func(k *datastore.Key) string { return k.Encode() })
 }
 
 // The NOT query
