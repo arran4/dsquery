@@ -517,3 +517,32 @@ func TestDSKeyMapMergeAnd(t *testing.T) {
 		}
 	})
 }
+
+func TestDSKeyMapMergeNot(t *testing.T) {
+	m := KeyMapCreate("1", "2")
+	keys := []*datastore.Key{datastore.NameKey("asdf", "1", nil)}
+	got := DSKeyMapMergeNot(m, keys)
+	if !KeyArraysEqual(ExtractMapStringKeysKey(got), KeyArrayCreate("2")) {
+		t.Errorf("DSKeyMapMergeNot() = %v, want %v", got, KeyArrayCreate("2"))
+	}
+}
+
+func TestMapIntersect(t *testing.T) {
+	m := map[string]string{"1": "a", "2": "b"}
+	items := []string{"2", "3"}
+	got := MapIntersect(m, items, func(v string) string { return v })
+	want := map[string]string{"2": "2"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("MapIntersect() = %v, want %v", got, want)
+	}
+}
+
+func TestMapExclude(t *testing.T) {
+	m := map[string]string{"1": "a", "2": "b"}
+	items := []string{"1"}
+	got := MapExclude(m, items, func(v string) string { return v })
+	want := map[string]string{"2": "b"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("MapExclude() = %v, want %v", got, want)
+	}
+}
