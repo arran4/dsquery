@@ -268,8 +268,8 @@ type Cached struct {
 
 // Count of all queries
 func (c *Cached) Len() int {
-	c.RWMutex.RLock()
-	defer c.RWMutex.RUnlock()
+	c.RLock()
+	defer c.RUnlock()
 	if c.StoredQuery != nil {
 		return c.StoredQuery.Len()
 	}
@@ -278,15 +278,15 @@ func (c *Cached) Len() int {
 
 // Query function
 func (c *Cached) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
-	c.RWMutex.RLock()
+	c.RLock()
 	if c.StoredResults != nil && (c.Expiration.IsZero() || time.Now().Before(c.Expiration)) {
-		defer c.RWMutex.RUnlock()
+		defer c.RUnlock()
 		return c.StoredResults, nil
 	}
-	c.RWMutex.RUnlock()
+	c.RUnlock()
 
-	c.RWMutex.Lock()
-	defer c.RWMutex.Unlock()
+	c.Lock()
+	defer c.Unlock()
 
 	if c.StoredResults != nil && (c.Expiration.IsZero() || time.Now().Before(c.Expiration)) {
 		return c.StoredResults, nil

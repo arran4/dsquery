@@ -54,8 +54,8 @@ Say for the query:
     fruitQuery := &dsquery.Or{
         Name: "root fruit query",
 		Queries:    []*datastore.Query{
-            datastore.NewQuery(FruitKind).Filter("Color =", "Orange"),
-            datastore.NewQuery(FruitKind).Filter("Color =", "Red"),
+            datastore.NewQuery(FruitKind).FilterField("Color", "=", "Orange"),
+            datastore.NewQuery(FruitKind).FilterField("Color", "=", "Red"),
         },
 		SubQueries: nil,
     }
@@ -86,14 +86,14 @@ Say for the query:
             &dsquery.Or{
                 Name: "color query",
                 Queries:    []*datastore.Query{
-                datastore.NewQuery(FruitKind).Filter("Color =", "Orange"),
-                datastore.NewQuery(FruitKind).Filter("Color =", "Red"),
+                datastore.NewQuery(FruitKind).FilterField("Color", "=", "Orange"),
+                datastore.NewQuery(FruitKind).FilterField("Color", "=", "Red"),
             },
             &dsquery.Or{
                 Name: "country query",
                 Queries:    []*datastore.Query{
-                datastore.NewQuery(FruitKind).Filter("Producers =", "USA"),
-                datastore.NewQuery(FruitKind).Filter("Producers =", "China"),
+                datastore.NewQuery(FruitKind).FilterField("Producers", "=", "USA"),
+                datastore.NewQuery(FruitKind).FilterField("Producers", "=", "China"),
             },
         },
     }

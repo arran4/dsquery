@@ -47,8 +47,8 @@ func ExampleOr() {
 	}}
 
 	q := &Or{Queries: []*datastore.Query{
-		datastore.NewQuery("Fruit").Filter("Color =", "Brown"),
-		datastore.NewQuery("Fruit").Filter("Color =", "Orange"),
+		datastore.NewQuery("Fruit").FilterField("Color", "=", "Brown"),
+		datastore.NewQuery("Fruit").FilterField("Color", "=", "Orange"),
 	}}
 
 	keys, _ := q.Query(ds, context.Background())
@@ -70,8 +70,8 @@ func ExampleAnd() {
 	}}
 
 	q := &And{Queries: []*datastore.Query{
-		datastore.NewQuery("Fruit").Filter("Color =", "Red"),
-		datastore.NewQuery("Fruit").Filter("Producers =", "USA"),
+		datastore.NewQuery("Fruit").FilterField("Color", "=", "Red"),
+		datastore.NewQuery("Fruit").FilterField("Producers", "=", "USA"),
 	}}
 
 	keys, _ := q.Query(ds, context.Background())
@@ -88,8 +88,8 @@ func ExampleCached() {
 	q := &countQuery{keys: []*datastore.Key{datastore.NameKey("Fruit", "1", nil)}}
 	cached := &Cached{StoredQuery: q}
 
-	cached.Query(nil, context.Background())
-	cached.Query(nil, context.Background())
+	_, _ = cached.Query(nil, context.Background())
+	_, _ = cached.Query(nil, context.Background())
 
 	fmt.Println(q.n)
 	// Output: 1
