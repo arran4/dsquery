@@ -75,6 +75,7 @@ func ExampleAnd() {
 	}}
 
 	keys, _ := q.Query(ds, context.Background())
+	sort.Slice(keys, func(i, j int) bool { return keys[i].Name < keys[j].Name })
 	for _, k := range keys {
 		fmt.Println(k.Name)
 	}
