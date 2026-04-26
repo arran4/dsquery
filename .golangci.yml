@@ -8,3 +8,5 @@ linters:
     - errcheck
     - ineffassign
     - revive
+    - unused
+    - gosimple
