@@ -14,7 +14,7 @@ import (
 // Query interface
 type Query interface {
 	// Query function runs the queries as per data structure
-	Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error)
+	Query(ctx context.Context, dsClient DatastoreClient) ([]*datastore.Key, error)
 	// Count of all queries
 	Len() int
 }
@@ -62,7 +62,7 @@ func (qa *And) Len() int {
 }
 
 // Query function
-func (qa *And) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+func (qa *And) Query(ctx context.Context, dsClient DatastoreClient) ([]*datastore.Key, error) {
 	m := map[string]*datastore.Key{}
 	v := 0
 	for i, q := range qa.Queries {
@@ -90,7 +90,7 @@ func (qa *And) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastor
 		if v > 1 && len(m) == 0 {
 			return []*datastore.Key{}, nil
 		}
-		keys, err := q.Query(dsClient, ctx)
+		keys, err := q.Query(ctx, dsClient)
 		if err != nil {
 			return nil, fmt.Errorf("query error in subquery %s:%d error %w", qa.Name, i, err)
 		}
@@ -152,7 +152,7 @@ func (qn *Not) Len() int {
 }
 
 // Query function
-func (qn *Not) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+func (qn *Not) Query(ctx context.Context, dsClient DatastoreClient) ([]*datastore.Key, error) {
 	m := map[string]*datastore.Key{}
 	for i, q := range qn.Queries {
 		keys, err := dsClient.GetAll(ctx, q.KeysOnly(), nil)
@@ -167,7 +167,7 @@ func (qn *Not) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastor
 		}
 	}
 	for i, q := range qn.SubQueries {
-		keys, err := q.Query(dsClient, ctx)
+		keys, err := q.Query(ctx, dsClient)
 		if err != nil {
 			return nil, fmt.Errorf("query error in subquery %s:%d error %w", qn.Name, i, err)
 		}
@@ -186,7 +186,7 @@ func (qo *Or) Len() int {
 }
 
 // Query function
-func (qo *Or) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+func (qo *Or) Query(ctx context.Context, dsClient DatastoreClient) ([]*datastore.Key, error) {
 	l := sync.Mutex{}
 	m := map[string]*datastore.Key{}
 	errChan := make(chan error)
@@ -213,7 +213,7 @@ func (qo *Or) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore
 	}
 	for i, q := range qo.SubQueries {
 		go func(i int, q Query) {
-			keys, err := q.Query(dsClient, ctx)
+			keys, err := q.Query(ctx, dsClient)
 			if err != nil {
 				errChan <- fmt.Errorf("query error in subquery %s:%d error %w", qo.Name, i, err)
 				return
@@ -248,7 +248,7 @@ func (qi *Ident) Len() int {
 }
 
 // Query function
-func (qi *Ident) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+func (qi *Ident) Query(ctx context.Context, dsClient DatastoreClient) ([]*datastore.Key, error) {
 	keys, err := dsClient.GetAll(ctx, qi.StoredQuery.KeysOnly(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("query error in %s error %w", qi.Name, err)
@@ -263,13 +263,13 @@ type Cached struct {
 	Name          string
 	TTL           time.Duration
 	Expiration    time.Time
-	sync.RWMutex
+	mu sync.RWMutex
 }
 
 // Count of all queries
 func (c *Cached) Len() int {
-	c.RLock()
-	defer c.RUnlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	if c.StoredQuery != nil {
 		return c.StoredQuery.Len()
 	}
@@ -277,22 +277,22 @@ func (c *Cached) Len() int {
 }
 
 // Query function
-func (c *Cached) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
-	c.RLock()
+func (c *Cached) Query(ctx context.Context, dsClient DatastoreClient) ([]*datastore.Key, error) {
+	c.mu.RLock()
 	if c.StoredResults != nil && (c.Expiration.IsZero() || time.Now().Before(c.Expiration)) {
-		defer c.RUnlock()
+		defer c.mu.RUnlock()
 		return c.StoredResults, nil
 	}
-	c.RUnlock()
+	c.mu.RUnlock()
 
-	c.Lock()
-	defer c.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	if c.StoredResults != nil && (c.Expiration.IsZero() || time.Now().Before(c.Expiration)) {
 		return c.StoredResults, nil
 	}
 
-	keys, err := c.StoredQuery.Query(dsClient, ctx)
+	keys, err := c.StoredQuery.Query(ctx, dsClient)
 	if err != nil {
 		return nil, fmt.Errorf("query error in %s error %w", c.Name, err)
 	}

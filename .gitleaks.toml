@@ -1,0 +1,11 @@
+title = "repo gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "global allowlist"
+paths = [
+  '''^docs/''',
+  '''^testdata/'''
+]

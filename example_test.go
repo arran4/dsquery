@@ -15,7 +15,7 @@ type staticDS struct {
 	results [][]*datastore.Key
 }
 
-func (m *staticDS) GetAll(ctx context.Context, q *datastore.Query, dst interface{}) ([]*datastore.Key, error) {
+func (m *staticDS) GetAll(_ context.Context, _ *datastore.Query, _ interface{}) ([]*datastore.Key, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if len(m.results) == 0 {
@@ -32,7 +32,7 @@ type countQuery struct {
 	keys []*datastore.Key
 }
 
-func (c *countQuery) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+func (c *countQuery) Query(_ context.Context, _ DatastoreClient) ([]*datastore.Key, error) {
 	c.n++
 	return c.keys, nil
 }
@@ -51,7 +51,7 @@ func ExampleOr() {
 		datastore.NewQuery("Fruit").FilterField("Color", "=", "Orange"),
 	}}
 
-	keys, _ := q.Query(ds, context.Background())
+	keys, _ := q.Query(context.Background(), ds)
 	sort.Slice(keys, func(i, j int) bool { return keys[i].Name < keys[j].Name })
 	for _, k := range keys {
 		fmt.Println(k.Name)
@@ -74,7 +74,7 @@ func ExampleAnd() {
 		datastore.NewQuery("Fruit").FilterField("Producers", "=", "USA"),
 	}}
 
-	keys, _ := q.Query(ds, context.Background())
+	keys, _ := q.Query(context.Background(), ds)
 	sort.Slice(keys, func(i, j int) bool { return keys[i].Name < keys[j].Name })
 	for _, k := range keys {
 		fmt.Println(k.Name)
@@ -89,8 +89,8 @@ func ExampleCached() {
 	q := &countQuery{keys: []*datastore.Key{datastore.NameKey("Fruit", "1", nil)}}
 	cached := &Cached{StoredQuery: q}
 
-	_, _ = cached.Query(nil, context.Background())
-	_, _ = cached.Query(nil, context.Background())
+	_, _ = cached.Query(context.Background(), nil)
+	_, _ = cached.Query(context.Background(), nil)
 
 	fmt.Println(q.n)
 	// Output: 1
