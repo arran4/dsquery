@@ -61,17 +61,17 @@ type MockDSResult struct {
 
 type MockDS struct {
 	m []MockDSResult
-	sync.Mutex
+	mu sync.Mutex
 }
 
-func (m *MockDS) GetAll(ctx context.Context, q *datastore.Query, dst interface{}) (keys []*datastore.Key, err error) {
-	m.Lock()
+func (m *MockDS) GetAll(_ context.Context, _ *datastore.Query, _ interface{}) (keys []*datastore.Key, err error) {
+	m.mu.Lock()
 	var r *MockDSResult
 	if len(m.m) > 0 {
 		r = &m.m[0]
 		m.m = m.m[1:]
 	}
-	m.Unlock()
+	m.mu.Unlock()
 	if r != nil {
 		if r.Lock != nil {
 			<-r.Lock
@@ -105,7 +105,7 @@ func TestAnd_Query(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.qa.Query(tt.args.dsClient, tt.args.ctx)
+			got, err := tt.qa.Query(tt.args.ctx, tt.args.dsClient)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -145,7 +145,7 @@ func TestOr_Query(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.qo.Query(tt.args.dsClient, tt.args.ctx)
+			got, err := tt.qo.Query(tt.args.ctx, tt.args.dsClient)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -167,7 +167,7 @@ type StoredResult struct {
 	err error
 }
 
-func (s *StoredResult) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+func (s *StoredResult) Query(_ context.Context, _ DatastoreClient) ([]*datastore.Key, error) {
 	return s.r1, s.err
 }
 
@@ -192,10 +192,10 @@ func KeyArraysEqual(a1 []*datastore.Key, a2 []*datastore.Key) bool {
 	}
 	m := make(map[string]int, len(a1))
 	for _, k := range a1 {
-		m[k.String()] += 1
+		m[k.String()]++
 	}
 	for _, k := range a2 {
-		m[k.String()] -= 1
+		m[k.String()]--
 	}
 	for _, v := range m {
 		if v != 0 {
@@ -263,7 +263,7 @@ func (qc *Count) Len() int {
 	return 1
 }
 
-func (qc *Count) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+func (qc *Count) Query(_ context.Context, _ DatastoreClient) ([]*datastore.Key, error) {
 	qc.Count++
 	return qc.StoredResult, nil
 }
@@ -276,11 +276,11 @@ var (
 	ErrCountExceeded = errors.New("count exceeded")
 )
 
-func (qo *Once) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+func (qo *Once) Query(ctx context.Context, dsClient DatastoreClient) ([]*datastore.Key, error) {
 	if qo.Count.Count > 0 {
 		return nil, ErrCountExceeded
 	}
-	return qo.Count.Query(dsClient, ctx)
+	return qo.Count.Query(ctx, dsClient)
 }
 
 type Lockable struct {
@@ -293,14 +293,14 @@ func (qo *Lockable) Len() int {
 	return 1
 }
 
-func (qo *Lockable) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+func (qo *Lockable) Query(ctx context.Context, dsClient DatastoreClient) ([]*datastore.Key, error) {
 	if qo.Lock != nil {
 		<-qo.Lock
 	}
 	if qo.Key != nil {
 		qo.Key <- struct{}{}
 	}
-	return qo.StoredQuery.Query(dsClient, ctx)
+	return qo.StoredQuery.Query(ctx, dsClient)
 }
 
 func TestIdent_Query(t *testing.T) {
@@ -329,7 +329,7 @@ func TestIdent_Query(t *testing.T) {
 				StoredQuery: tt.fields.StoredQuery,
 				Name:        tt.fields.Name,
 			}
-			got, err := qi.Query(tt.args.dsClient, tt.args.ctx)
+			got, err := qi.Query(tt.args.ctx, tt.args.dsClient)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -370,7 +370,7 @@ func TestCached_Query(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.query.Query(tt.args.dsClient, tt.args.ctx)
+			got, err := tt.query.Query(tt.args.ctx, tt.args.dsClient)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -408,7 +408,7 @@ func TestNot_Query(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.nq.Query(tt.args.dsClient, tt.args.ctx)
+			got, err := tt.nq.Query(tt.args.ctx, tt.args.dsClient)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Query() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -427,7 +427,7 @@ func TestNot_Query(t *testing.T) {
 
 type Error struct{ error }
 
-func (e *Error) Query(dsClient DatastoreClient, ctx context.Context) ([]*datastore.Key, error) {
+func (e *Error) Query(_ context.Context, _ DatastoreClient) ([]*datastore.Key, error) {
 	return nil, e.error
 }
 
@@ -439,14 +439,14 @@ func TestCached_Expiration(t *testing.T) {
 	c := &Count{StoredResult: KeyArrayCreate("a")}
 	cache := &Cached{StoredQuery: c, TTL: 10 * time.Millisecond}
 
-	if _, err := cache.Query(nil, nil); err != nil {
+	if _, err := cache.Query(context.TODO(), nil); err != nil {
 		t.Fatalf("first query error %v", err)
 	}
 	if c.Count != 1 {
 		t.Fatalf("count = %d, want 1", c.Count)
 	}
 
-	if _, err := cache.Query(nil, nil); err != nil {
+	if _, err := cache.Query(context.TODO(), nil); err != nil {
 		t.Fatalf("second query error %v", err)
 	}
 	if c.Count != 1 {
@@ -455,7 +455,7 @@ func TestCached_Expiration(t *testing.T) {
 
 	time.Sleep(15 * time.Millisecond)
 
-	if _, err := cache.Query(nil, nil); err != nil {
+	if _, err := cache.Query(context.TODO(), nil); err != nil {
 		t.Fatalf("third query error %v", err)
 	}
 	if c.Count != 2 {
@@ -468,7 +468,7 @@ func TestCachedQuery_StoredResults(t *testing.T) {
 		StoredQuery:   &Count{StoredResult: KeyArrayCreate("b")},
 		StoredResults: KeyArrayCreate("a"),
 	}
-	got, err := c.Query(nil, nil)
+	got, err := c.Query(context.TODO(), nil)
 	if err != nil {
 		t.Fatalf("Query() error = %v", err)
 	}

@@ -53,7 +53,7 @@ func main() {
 		},
 	}
 
-	keys, err := q.Query(client, ctx)
+	keys, err := q.Query(ctx, client)
 	if err != nil {
 		log.Fatalf("query error: %v", err)
 	}
