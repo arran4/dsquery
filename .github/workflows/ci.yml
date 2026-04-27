@@ -428,6 +428,9 @@ jobs:
           if [[ -n "$prerelease" ]]; then
             gh release create "$TAG" --generate-notes $prerelease || true
           else
-            gh release create "$TAG" --generate-notes $discussion_arg || \
-              gh release create "$TAG" --generate-notes
+            gh release create "$TAG" --generate-notes $discussion_arg || {
+              if ! gh release view "$TAG" >/dev/null 2>&1; then
+                gh release create "$TAG" --generate-notes
+              fi
+            }
           fi
