@@ -112,6 +112,9 @@ func (qa *And) Query(ctx context.Context, dsClient DatastoreClient) ([]*datastor
 // MapIntersect intersects `m` with `items` and returns a new map containing only
 // the items whose derived key exists in `m`.
 func MapIntersect[K comparable, V any, I any](m map[K]V, items []I, keyFn func(I) (K, bool)) map[K]V {
+	if len(m) == 0 {
+		return m
+	}
 	s := len(m)
 	if s > len(items) {
 		s = len(items)
@@ -131,6 +134,9 @@ func MapIntersect[K comparable, V any, I any](m map[K]V, items []I, keyFn func(I
 
 // MapExclude removes all entries from `m` whose keys appear in `items`.
 func MapExclude[K comparable, V any, I any](m map[K]V, items []I, keyFn func(I) (K, bool)) map[K]V {
+	if len(m) == 0 {
+		return m
+	}
 	m2 := make(map[K]V, len(m))
 	for k, v := range m {
 		m2[k] = v

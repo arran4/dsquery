@@ -518,8 +518,13 @@ func TestDSKeyMapMergeNot(t *testing.T) {
 
 func TestMapIntersect(t *testing.T) {
 	m := map[string]string{"1": "a", "2": "b"}
-	items := []string{"2", "3"}
-	got := MapIntersect(m, items, func(v string) (string, bool) { return v, true })
+	items := []string{"2", "3", "ignored"}
+	got := MapIntersect(m, items, func(v string) (string, bool) {
+		if v == "ignored" {
+			return "", false
+		}
+		return v, true
+	})
 	want := map[string]string{"2": "b"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("MapIntersect() = %v, want %v", got, want)
@@ -528,8 +533,13 @@ func TestMapIntersect(t *testing.T) {
 
 func TestMapExclude(t *testing.T) {
 	m := map[string]string{"1": "a", "2": "b"}
-	items := []string{"1"}
-	got := MapExclude(m, items, func(v string) (string, bool) { return v, true })
+	items := []string{"1", "ignored"}
+	got := MapExclude(m, items, func(v string) (string, bool) {
+		if v == "ignored" {
+			return "", false
+		}
+		return v, true
+	})
 	want := map[string]string{"2": "b"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("MapExclude() = %v, want %v", got, want)
