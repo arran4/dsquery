@@ -293,7 +293,7 @@ type Cached struct {
 	Name          string
 	TTL           time.Duration
 	Expiration    time.Time
-	mu sync.RWMutex
+	mu            sync.RWMutex
 }
 
 // Count of all queries
