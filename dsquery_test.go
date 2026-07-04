@@ -60,7 +60,7 @@ type MockDSResult struct {
 }
 
 type MockDS struct {
-	m []MockDSResult
+	m  []MockDSResult
 	mu sync.Mutex
 }
 
