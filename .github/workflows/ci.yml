@@ -138,7 +138,7 @@ jobs:
       release_tag: ${{ steps.tag.outputs.release_tag }}
       next_version: ${{ steps.tag.outputs.next_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Setup git-tag-inc
@@ -234,7 +234,7 @@ jobs:
       has_dart_or_flutter_tests: ${{ steps.detect.outputs.has_dart_or_flutter_tests }}
       has_packaging: ${{ steps.detect.outputs.has_packaging }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - id: detect
         shell: bash
         run: |
@@ -266,7 +266,7 @@ jobs:
     if: ${{ needs.route.outputs.run_cleanup != 'true' && (needs.route.outputs.is_nightly == 'true' || needs.route.outputs.is_monthly == 'true') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
@@ -287,10 +287,10 @@ jobs:
     if: ${{ needs.discover.outputs.has_go == 'true' && needs.route.outputs.run_code_checks == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
@@ -306,10 +306,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
           cache: true
       - name: Test
         run: go test -race ./... -v
@@ -320,10 +320,10 @@ jobs:
     if: ${{ needs.discover.outputs.has_go == 'true' && needs.route.outputs.run_code_checks == 'true' && needs.discover.outputs.profile == 'public' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
           cache: true
       - run: go vet ./...
 
@@ -333,12 +333,12 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'lint-fix' && inputs.allow_prs == true }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Go (if needed)
         if: ${{ needs.discover.outputs.has_go == 'true' }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: stable
       - name: Run autofix formatters
         shell: bash
         run: |
@@ -378,7 +378,7 @@ jobs:
     if: ${{ needs.route.outputs.run_cleanup == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PARENT_PR: ${{ github.event.pull_request.number }}
@@ -400,7 +400,7 @@ jobs:
       contents: write
       discussions: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Sync version source with highest existing tag first
