@@ -294,11 +294,13 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          # Keep CI lint behavior reproducible across runs.
+          version: v2.15.0
 
   go-test:
     name: Go lint/test (${{ matrix.os }})
-    needs: [route, discover, golangci]
+    # Tests must run even if the lint binary cannot be downloaded.
+    needs: [route, discover]
     if: ${{ needs.discover.outputs.has_go == 'true' && needs.route.outputs.run_code_checks == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
